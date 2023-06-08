@@ -6,36 +6,32 @@ on:
       - synchronize
 
 jobs:
-  send_notification:
+  merge_conflict:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-    
-    - name: Install dependencies
-      run: |
-        npm install -g yarn
-        yarn install
-        
-    - name: Check for merge conflicts
-      run: |
-        git merge --no-commit --no-ff ${{ github.base_ref }}
-        if [ $? -eq 0 ]; then
-          echo "No merge conflict detected."
-          exit 0
-        else
-          echo "Merge conflict detected."
-          git --no-pager diff
-          echo "::set-output name=merge_conflict::true"
-          exit 1
-        fi
-    
-    - name: Send notification to Slack
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        SLACK_MESSAGE: |
-          :warning: Merge conflict detected in repository: ${{ github.repository }}
-          Commit: ${{ github.sha }}
-          Branch: ${{ github.ref }}
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for merge conflicts
+        run: git diff --name-only origin/${{ github.base_ref }}...origin/${{ github.head_ref }} | xargs git diff-tree --check
+        continue-on-error: true
+
+      - name: Send Slack notification on merge conflict
+        if: ${{ failure() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{
+            "text": "Merge conflict detected in PR <${{ env.PR_URL }}|#${{ env.PR_NUMBER }}>"
+          }' $SLACK_WEBHOOK_URL
