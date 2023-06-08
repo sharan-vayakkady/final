@@ -1,0 +1,36 @@
+name: Slack Notification
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      
+   - name: Check for merge conflicts
+        id: merge_conflicts
+        run: |
+          git fetch origin
+          git diff --name-only origin/main -- '*.conflict'
+
+      - name: Send Slack notification
+        if: steps.merge_conflicts.outputs.merge_conflicts != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          MESSAGE: 'Merge conflicts detected in the following files:'
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{
+            "text": "'"${MESSAGE}"'",
+            "attachments": [
+              {
+                "color": "#FF0000",
+                "text": "'"${{ steps.merge_conflicts.outputs.merge_conflicts }}"'"
+              }
+            ]
+          }' $SLACK_WEBHOOK_URL
