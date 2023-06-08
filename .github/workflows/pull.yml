@@ -1,0 +1,22 @@
+name: Slack Notification
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Notify Slack
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      run: |
+        curl -X POST -H 'Content-type: application/json' --data '{
+          "text": "A pull request has been opened or updated on the main branch.\n\nRepository: ${{ github.repository }}\nTitle: ${{ github.event.pull_request.title }}\nAuthor: ${{ github.event.pull_request.user.login }}\nURL: ${{ github.event.pull_request.html_url }}"
+        }' $SLACK_WEBHOOK_URL
