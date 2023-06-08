@@ -1,28 +1,41 @@
 name: Merge Conflict Notification
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types:
+      - synchronize
 
 jobs:
-  check-merge-conflict:
+  send_notification:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Check for merge conflicts
-        id: conflicts
-        run: |
-          git fetch origin
-          git diff origin/main --name-only --diff-filter=U > conflicts.txt
-          echo "::set-output name=conflict_files::$(cat conflicts.txt)"
-
-      - name: Notify Slack
-        if: ${{ steps.conflicts.outputs.conflict_files != '' }}
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        run: |
-          curl -X POST -H 'Content-type: application/json' --data '{"text":"Merge conflict detected in the following files: '${{ steps.conflicts.outputs.conflict_files }}'"}' $SLACK_WEBHOOK
+    - name: Checkout code
+      uses: actions/checkout@v2
+    
+    - name: Install dependencies
+      run: |
+        npm install -g yarn
+        yarn install
+        
+    - name: Check for merge conflicts
+      run: |
+        git merge --no-commit --no-ff ${{ github.base_ref }}
+        if [ $? -eq 0 ]; then
+          echo "No merge conflict detected."
+          exit 0
+        else
+          echo "Merge conflict detected."
+          git --no-pager diff
+          echo "::set-output name=merge_conflict::true"
+          exit 1
+        fi
+    
+    - name: Send notification to Slack
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_MESSAGE: |
+          :warning: Merge conflict detected in repository: ${{ github.repository }}
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref }}
