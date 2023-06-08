@@ -1,0 +1,32 @@
+name: Merge Conflict Notification
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-merge-conflict:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Check for merge conflicts
+        id: conflicts
+        run: |
+          git fetch origin
+          git diff origin/main --name-only --diff-filter=U > conflicts.txt
+          echo "::set-output name=conflict_files::$(cat conflicts.txt)"
+
+      - name: Notify Slack
+        if: ${{ steps.conflicts.outputs.conflict_files != '' }}
+        uses: slackapi/slack@v3.4.0
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        with:
+          args: |
+            chat.postMessage
+            --channel=sharan_github_notifications
+            --text=":warning: Merge conflict detected in the following files: ${{ steps.conflicts.outputs.conflict_files }}"
