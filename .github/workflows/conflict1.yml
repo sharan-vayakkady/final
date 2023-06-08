@@ -1,4 +1,4 @@
-name: Slack Notification
+name: conflit_merge
 
 on:
   pull_request:
