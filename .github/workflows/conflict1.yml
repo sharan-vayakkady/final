@@ -1,4 +1,4 @@
-name: conflit_merge
+name: Slack Notification1
 
 on:
   pull_request:
@@ -6,31 +6,23 @@ on:
       - main
 
 jobs:
-  notify-slack:
+  notify-slack1:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-      
-   - name: Check for merge conflicts
-        id: merge_conflicts
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Check for merge conflicts
+        id: conflicts
         run: |
           git fetch origin
-          git diff --name-only origin/main -- '*.conflict'
+          git diff origin/main --name-only --diff-filter=U > conflicts.txt
+          echo "::set-output name=conflict_files::$(cat conflicts.txt)"
 
-      - name: Send Slack notification
-        if: steps.merge_conflicts.outputs.merge_conflicts != ''
+      - name: Notify Slack
+        if: ${{ steps.conflicts.outputs.conflict_files != '' }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-          MESSAGE: 'Merge conflicts detected in the following files:'
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: |
-          curl -X POST -H 'Content-type: application/json' --data '{
-            "text": "'"${MESSAGE}"'",
-            "attachments": [
-              {
-                "color": "#FF0000",
-                "text": "'"${{ steps.merge_conflicts.outputs.merge_conflicts }}"'"
-              }
-            ]
-          }' $SLACK_WEBHOOK_URL
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"Merge conflict detected in the following files: '${{ steps.conflicts.outputs.conflict_files }}'"}' $SLACK_WEBHOOK
